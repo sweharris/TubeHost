@@ -1435,8 +1435,6 @@ sub OSFILE()
     $fend=$flocked?$FILE_LOCKED:$FILE_UNLOCKED;
   }
 
-  # We don't allow save/delete/create on a locked file
-
   my $a_return=1; # File found is the default return code (no directories!)
 
   if ( $cmd == 255)  # LOAD
@@ -1450,6 +1448,7 @@ sub OSFILE()
   }
   elsif ($cmd == 0 || $cmd == 7) # SAVE
   {
+    # We don't allow save/create on a locked file
     error(195,"Locked") if $flocked;
     # What file should we save to?
     # If this is a new file, generate the name
@@ -1498,12 +1497,13 @@ sub OSFILE()
     save_inf("$fullpath.inf",$fname,$fload,$fexec,$end,$crc);
     $end=$flocked;
   }
-  elsif ($cmd == 5)
+  elsif ($cmd == 5) # Read attributes
   {
     ($load,$exec,$end,$save)=($fload,$fexec,$flocked,$fsave);
   }
-  elsif ($cmd == 6)
+  elsif ($cmd == 6) # Delete
   {
+    # We don't allow delete on a locked file
     error(195,"Locked") if $flocked;
     unlink($fullpath);
     unlink("$fullpath.inf");
