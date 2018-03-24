@@ -1,5 +1,8 @@
-The latest version of this code is always at
+The latest published version of this code is always at
   http://sweh.spuddy.org/Beeb/TubeHost/
+
+There is a working GIT repo (which may be ahead of the published version)
+  https://github.com/sweharris/TubeHost
 
 This is a Unix TubeHost filesystem written in perl based around JGH's
 HostFS concept
