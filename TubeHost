@@ -33,6 +33,8 @@
 #                      Add "I AM" as an alternative to IAM (RiscOS)
 #                      Allow OSFSC commands to being with a \ to
 #                       bypass ROM calls (eg *\BEEP will always call OSFSC)
+#                      *RUN nosuchfile now returns a 214 Not found error
+#                       but *nosuchfile still returns 254 Bad command
 #                         Thanks to jgh for these
 
 my $VERSION="0.11";
@@ -1120,7 +1122,7 @@ sub OSFSC_cmd($$)
       $string=~s/^\\//;
       debug(1,"Stripping off leading \\ from command");
     }
-    OSFSC_do_run($string);
+    OSFSC_do_run($string,1);
   }
 }
 
@@ -1176,7 +1178,7 @@ sub OSFSC_run($$)
   send_byte(127);
   my $string=read_string;
   debug(1,"File to run: $string");
-  OSFSC_do_run($string);
+  OSFSC_do_run($string,0);
 }
 
 sub OSFSC_librun($$)
@@ -1185,14 +1187,14 @@ sub OSFSC_librun($$)
   send_byte(127);
   my $string=read_string;
   debug(1,"File to lib run: $string");
-  OSFSC_do_run($string,1);
+  OSFSC_do_run($string,0,1);
 }
 
-sub OSFSC_do_run($;$)
+sub OSFSC_do_run($$;$)
 {
-  my ($string,$lib_only)=@_; $lib_only+=0;
+  my ($string,$err_type,$lib_only)=@_; $lib_only+=0;
   $string=extract_filename($string);
-  debug(1,"Run from filesystem $string - $lib_only");
+  debug(1,"Run from filesystem $string - $err_type - $lib_only");
   my ($ldrive,$ldir,$lfile,$want,%files);
 
   if (!$lib_only)
@@ -1222,7 +1224,11 @@ sub OSFSC_do_run($;$)
     %files=get_cat($ldrive);
   }
 
-  error(254,"Bad command") unless defined($files{$want});
+  if (!defined($files{$want}))
+  {
+    if ($err_type) { error(254,"Bad command"); }
+             else  { error(214,"Not found"); }
+  }
 
   send_file($files{$want}{fullpath},$files{$want}{load});
   send_cmd(0xc0);    # set execution address
