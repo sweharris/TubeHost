@@ -29,8 +29,22 @@
 #                      Bug fix in *RENAME (how did that ever work)
 #                      Don't hardcode my home directory
 #                         Thanks to hoglet for these
+# v0.11 - 2018/03/24 - DBOOT sends to 0xffff0100
+#                      Add "I AM" as an alternative to IAM (RiscOS)
+#                      Allow OSFSC commands to being with a \ to
+#                       bypass ROM calls (eg *\BEEP will always call OSFSC)
+#                      *RUN nosuchfile now returns a 214 Not found error
+#                       but *nosuchfile still returns 254 Bad command
+#                      OSFILE shouldn't error on file not found, but return
+#                       A=0
+#                      OSFILE should allow some changes on locked files
+#                      OSFILE A=4 is change attribute!
+#                      OSFILE returns A=0 on unknown call numbers
+#                      Silently ignore unexpected escape commands
+#                      Various errors changed to better numbers/strings
+#                         Thanks to jgh for these
 
-my $VERSION="0.10";
+my $VERSION="0.11";
 
 my $SERIAL=1;
 my $UPURS=0;
@@ -174,7 +188,7 @@ sub cmd_match($$)
 sub need_arg($)
 {
   my ($str)=@_;
-  error(214,"Missing argument") unless $str ne "";
+  error(220,"Missing argument") unless $str ne "";
   return $str;
 }
 
@@ -223,7 +237,12 @@ sub read_char(;$)
       $ch=raw_read_char;
       if ($ch ne $escape)
       {
-        error(255,"Unexpected escape command received") unless $escape_good;
+        if (!$escape_good)
+        {
+          debug(20,"Unexpected escape command received; ignored");
+          $ch="";
+          next;
+        }
         my $i=ord($ch);
         debug(20,"Escape command received: &" . to_hex($i));
         my $cmd=($i & 0x1E);
@@ -513,7 +532,7 @@ sub check_disk_num($$)
   my ($d,$disks)=@_;
   if ($d !~ /^\d+$/)
   {
-    error(199,"Bad disk number: $d");
+    error(205,"Bad disk number: $d");
   }
   error(199,"No disk $d") unless defined $disks->{$d};
   return $d;
@@ -894,11 +913,11 @@ sub OSFSC_cmd($$)
     {
       my $dnum=$1;
       my %d=get_disks;
-      error(199,"Already have a disk in slot $dnum") if $d{$dnum};
+      error(155,"Already have a disk in slot $dnum") if $d{$dnum};
     }
     my $want2=$want;
     $want2=~tr/ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_+.!@$%,-/_/c;
-    error(199,"Bad characters present") unless $want eq $want2;
+    error(253,"Bad characters present") unless $want eq $want2;
     mkdir("$disk_base/$want");
     debug(10,"Made $disk_base/$want");
     send_output("$want created\r\n");
@@ -971,6 +990,14 @@ sub OSFSC_cmd($$)
   }
   elsif (cmd_match($cmd,'IAM'))
   {
+    my $x=join(" ",@args);
+    
+    $identity=$x || 'Anonymous';
+    send_output("You are: $identity\r\n");
+  }
+  elsif (cmd_match($cmd,'I') && $args[0] && $args[0] =~ /^AM$/i)
+  {
+    shift @args;
     my $x=join(" ",@args);
     
     $identity=$x || 'Anonymous';
@@ -1099,7 +1126,15 @@ sub OSFSC_cmd($$)
   {
     # Oh well.. we don't know this command; treat as *RUN
     debug(1,"Not handled by us; passing to *RUN routine");
-    OSFSC_do_run($string);
+    # If the string begins with a \ then strip it off.  This
+    # means we do do *\foobar and it'll bypass all ROMs, and just
+    # be handled by OSFSC.  Idea from JGH
+    if ($string =~ /^\\/)
+    {
+      $string=~s/^\\//;
+      debug(1,"Stripping off leading \\ from command");
+    }
+    OSFSC_do_run($string,1);
   }
 }
 
@@ -1155,7 +1190,7 @@ sub OSFSC_run($$)
   send_byte(127);
   my $string=read_string;
   debug(1,"File to run: $string");
-  OSFSC_do_run($string);
+  OSFSC_do_run($string,0);
 }
 
 sub OSFSC_librun($$)
@@ -1164,14 +1199,14 @@ sub OSFSC_librun($$)
   send_byte(127);
   my $string=read_string;
   debug(1,"File to lib run: $string");
-  OSFSC_do_run($string,1);
+  OSFSC_do_run($string,0,1);
 }
 
-sub OSFSC_do_run($;$)
+sub OSFSC_do_run($$;$)
 {
-  my ($string,$lib_only)=@_; $lib_only+=0;
+  my ($string,$err_type,$lib_only)=@_; $lib_only+=0;
   $string=extract_filename($string);
-  debug(1,"Run from filesystem $string - $lib_only");
+  debug(1,"Run from filesystem $string - $err_type - $lib_only");
   my ($ldrive,$ldir,$lfile,$want,%files);
 
   if (!$lib_only)
@@ -1201,7 +1236,11 @@ sub OSFSC_do_run($;$)
     %files=get_cat($ldrive);
   }
 
-  error(254,"Bad command") unless defined($files{$want});
+  if (!defined($files{$want}))
+  {
+    if ($err_type) { error(254,"Bad command"); }
+             else  { error(214,"Not found"); }
+  }
 
   send_file($files{$want}{fullpath},$files{$want}{load});
   send_cmd(0xc0);    # set execution address
@@ -1366,8 +1405,18 @@ sub OSFILE()
   my $key=uc("$ldir.$lfile");  debug(35,"OSFILE key $key");
   my %cat=get_cat($ldrive);
 
-  # If we're not saving a new file then it must exist
-  error(214,"File not found") if $cmd != 0 && $cmd != 7 && !$cat{$key};
+  # If we're not saving a new file then it must exist.  Return "not found"
+  # if it doesn't
+  if ($cmd !=0 && $cmd != 7 && !$cat{$key})
+  {
+    # We have to send the whole parameter block for a non-existing file
+    send_byte(0); # File not found
+    send_addr($end);
+    send_addr($save);
+    send_addr($exec);
+    send_addr($load);
+    return;
+  }
 
   # What does the existing file hold?
   my ($fname,$fload,$fexec,$fsave,$fend,$fullpath,$flocked,$crc);
@@ -1386,8 +1435,7 @@ sub OSFILE()
     $fend=$flocked?$FILE_LOCKED:$FILE_UNLOCKED;
   }
 
-  # Anything except "load" and "read file info" rewrites, so...
-  error(195,"Locked") if $flocked && $cmd != 255 && $cmd != 5;
+  my $a_return=1; # File found is the default return code (no directories!)
 
   if ( $cmd == 255)  # LOAD
   {
@@ -1400,6 +1448,8 @@ sub OSFILE()
   }
   elsif ($cmd == 0 || $cmd == 7) # SAVE
   {
+    # We don't allow save/create on a locked file
+    error(195,"Locked") if $flocked;
     # What file should we save to?
     # If this is a new file, generate the name
     $fullpath=gen_path($ldrive,"$ldir.$lfile") unless $fullpath;
@@ -1442,27 +1492,31 @@ sub OSFILE()
     save_inf("$fullpath.inf",$fname,$fload,$exec,$flocked,$crc);
     ($load,$end)=($fload,$flocked);
   }
-  elsif ($cmd == 4) # Change load/exec address
+  elsif ($cmd == 4) # Change attributes
   {
-    save_inf("$fullpath.inf",$fname,$load,$exec,$flocked,$crc);
+    save_inf("$fullpath.inf",$fname,$fload,$fexec,$end,$crc);
     $end=$flocked;
   }
-  elsif ($cmd == 5)
+  elsif ($cmd == 5) # Read attributes
   {
     ($load,$exec,$end,$save)=($fload,$fexec,$flocked,$fsave);
   }
-  elsif ($cmd == 6)
+  elsif ($cmd == 6) # Delete
   {
+    # We don't allow delete on a locked file
+    error(195,"Locked") if $flocked;
     unlink($fullpath);
     unlink("$fullpath.inf");
   }
   else
   {
-    error(214,"You want $cmd for $file");
+    # Return "not found" to the caller
+    $a_return=0;
+    debug(5,"OSFILE unknown: $cmd for $file");
   }
 
   # Send results
-  send_byte(1);    # File found; directories aren't possible
+  send_byte($a_return);    
   send_addr($end);
   send_addr($save);
   send_addr($exec);
