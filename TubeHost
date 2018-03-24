@@ -974,7 +974,7 @@ sub OSFSC_cmd($$)
   }
   elsif (cmd_match($cmd,'RENAME'))
   {
-    my $string=extractfilename(need_arg($args[0]));
+    my $string=extract_filename(need_arg($args[0]));
     my $canon=canonify($string);
     check_is_open($canon);
     my ($ldrive,$ldir,$lfile)=decompose($canon);
