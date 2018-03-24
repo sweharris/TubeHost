@@ -35,7 +35,7 @@ my $BAUD=9600;
 my $PAUSE_AFTER=1;
 my $PAUSE_DELAY=2;
 my $DEBUG=$ENV{DEBUG} || 0;
-my $disk_base="/home/sweh/Beeb_Disks";
+my $disk_base=( $ENV{HOME}?$ENV{HOME}:"" ) . "/Beeb_Disks";
 my $identity="Anonymous";
 
 my @ORIG_ARGV=@ARGV;
