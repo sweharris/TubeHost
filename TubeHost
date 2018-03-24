@@ -68,6 +68,7 @@ eval "use Device::SerialPort" if $SERIAL;
 use strict;
 use FileHandle;
 use Socket;
+use POSIX qw( TCIFLUSH );
 use IO::Socket::UNIX qw( SOCK_STREAM );
 
 my $FILE_LOCKED=8;
@@ -285,8 +286,21 @@ sub read_data_from_memory($$)
   {
     $data .= read_char;
   }
-  debug(1,"Receive $len characters complete");
   send_cmd(0xb0);
+  # Whilst the 0xb0 command is "in flight" the client can continue to send.
+  # If nothing is done, this extra data can cause the tube host protocol
+  # to get out of sync. To fix this, we wait 10ms for any extra data to be
+  # transmitted and then purge the input buffer.
+  select(undef,undef,undef, 0.01);
+  if ($SERIAL)
+  {
+    $socket->purge_rx;
+  }
+  else
+  {
+    POSIX::tcflush(fileno($socket), TCIFLUSH); 
+  } 
+  debug(1,"Receive $len characters complete");
   return $data;
 }
 
