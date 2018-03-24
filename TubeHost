@@ -25,8 +25,12 @@
 #                      Allow disk names with a number prefix to be called
 #                      without the number
 # v0.09 - 2013/09/22 - Move IAM later down the list so *I. calls INFO
+# v0.10 - 2018/03/23 - Bug fix in read_data_from_memory; purge buffer
+#                      Bug fix in *RENAME (how did that ever work)
+#                      Don't hardcode my home directory
+#                         Thanks to hoglet for these
 
-my $VERSION="0.09";
+my $VERSION="0.10";
 
 my $SERIAL=1;
 my $UPURS=0;
@@ -921,9 +925,9 @@ sub OSFSC_cmd($$)
     # *fx 255 7, followed by JMP (&FFFC)
     my @code=(0xA9,0xFF,0xA2,0x07,0xA0,000,0x20,0xF4,0xFF,0x6C,0xFC,0xFF);
 
-    send_data_to_memory(0x0900,@code);
+    send_data_to_memory(0xffff0100,@code);
     send_cmd(0xc0);    # set execution address
-    send_addr(0x0900);
+    send_addr(0xffff0100);
     send_byte(0x80);   # do it!
   } 
   elsif (cmd_match($cmd,'DRIVE'))
