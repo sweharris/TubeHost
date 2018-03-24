@@ -260,6 +260,7 @@ can be prefixed with a ! if a ROM or OS commands conflicts
      to startup mode (default disks, default directories, no open files etc)
    
   *IAM
+  *I AM
      Identify yourself.  So far this has no use except for reporting in
      *VERSION but might be usable in the future
 

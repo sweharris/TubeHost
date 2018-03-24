@@ -29,8 +29,11 @@
 #                      Bug fix in *RENAME (how did that ever work)
 #                      Don't hardcode my home directory
 #                         Thanks to hoglet for these
+# v0.11 - 2018/03/24 - DBOOT sends to 0xffff0100
+#                      Add "I AM" as an alternative to IAM (RiscOS)
+#                         Thanks to jgh for these
 
-my $VERSION="0.10";
+my $VERSION="0.11";
 
 my $SERIAL=1;
 my $UPURS=0;
@@ -971,6 +974,14 @@ sub OSFSC_cmd($$)
   }
   elsif (cmd_match($cmd,'IAM'))
   {
+    my $x=join(" ",@args);
+    
+    $identity=$x || 'Anonymous';
+    send_output("You are: $identity\r\n");
+  }
+  elsif (cmd_match($cmd,'I') && $args[0] && $args[0] =~ /^AM$/i)
+  {
+    shift @args;
     my $x=join(" ",@args);
     
     $identity=$x || 'Anonymous';
