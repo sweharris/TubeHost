@@ -31,6 +31,8 @@
 #                         Thanks to hoglet for these
 # v0.11 - 2018/03/24 - DBOOT sends to 0xffff0100
 #                      Add "I AM" as an alternative to IAM (RiscOS)
+#                      Allow OSFSC commands to being with a \ to
+#                       bypass ROM calls (eg *\BEEP will always call OSFSC)
 #                         Thanks to jgh for these
 
 my $VERSION="0.11";
@@ -1110,6 +1112,14 @@ sub OSFSC_cmd($$)
   {
     # Oh well.. we don't know this command; treat as *RUN
     debug(1,"Not handled by us; passing to *RUN routine");
+    # If the string begins with a \ then strip it off.  This
+    # means we do do *\foobar and it'll bypass all ROMs, and just
+    # be handled by OSFSC.  Idea from JGH
+    if ($string =~ /^\\/)
+    {
+      $string=~s/^\\//;
+      debug(1,"Stripping off leading \\ from command");
+    }
     OSFSC_do_run($string);
   }
 }
