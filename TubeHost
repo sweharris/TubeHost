@@ -40,6 +40,8 @@
 #                      OSFILE should allow some changes on locked files
 #                      OSFILE A=4 is change attribute!
 #                      OSFILE returns A=0 on unknown call numbers
+#                      Silently ignore unexpected escape commands
+#                      Various errors changed to better numbers/strings
 #                         Thanks to jgh for these
 
 my $VERSION="0.11";
@@ -186,7 +188,7 @@ sub cmd_match($$)
 sub need_arg($)
 {
   my ($str)=@_;
-  error(214,"Missing argument") unless $str ne "";
+  error(220,"Missing argument") unless $str ne "";
   return $str;
 }
 
@@ -235,7 +237,12 @@ sub read_char(;$)
       $ch=raw_read_char;
       if ($ch ne $escape)
       {
-        error(255,"Unexpected escape command received") unless $escape_good;
+        if (!$escape_good)
+        {
+          debug(20,"Unexpected escape command received; ignored");
+          $ch="";
+          next;
+        }
         my $i=ord($ch);
         debug(20,"Escape command received: &" . to_hex($i));
         my $cmd=($i & 0x1E);
@@ -525,7 +532,7 @@ sub check_disk_num($$)
   my ($d,$disks)=@_;
   if ($d !~ /^\d+$/)
   {
-    error(199,"Bad disk number: $d");
+    error(205,"Bad disk number: $d");
   }
   error(199,"No disk $d") unless defined $disks->{$d};
   return $d;
@@ -906,11 +913,11 @@ sub OSFSC_cmd($$)
     {
       my $dnum=$1;
       my %d=get_disks;
-      error(199,"Already have a disk in slot $dnum") if $d{$dnum};
+      error(155,"Already have a disk in slot $dnum") if $d{$dnum};
     }
     my $want2=$want;
     $want2=~tr/ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_+.!@$%,-/_/c;
-    error(199,"Bad characters present") unless $want eq $want2;
+    error(253,"Bad characters present") unless $want eq $want2;
     mkdir("$disk_base/$want");
     debug(10,"Made $disk_base/$want");
     send_output("$want created\r\n");
