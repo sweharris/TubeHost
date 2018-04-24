@@ -43,8 +43,13 @@
 #                      Silently ignore unexpected escape commands
 #                      Various errors changed to better numbers/strings
 #                         Thanks to jgh for these
+# v0.12 - 2018/04/24 - Add *TYPE command for machines that need it
+#                      Fix debug message in OSGBPB()
+#                      Update open file PTR for OSGBPB
+#                      OSGBPB 8 ("read dir") wasn't limiting to the matches
+#                         Thanks to dominicbeesley for these
 
-my $VERSION="0.11";
+my $VERSION="0.12";
 
 my $SERIAL=1;
 my $UPURS=0;
@@ -1119,6 +1124,39 @@ sub OSFSC_cmd($$)
     }
     send_output($r);
   }
+  elsif (cmd_match($cmd,'TYPE'))
+  {
+    my $string=extract_filename(need_arg($args[0]));
+    my $canon=canonify($string);
+    check_is_open($canon);
+    my ($ldrive,$ldir,$lfile)=decompose($canon);
+    my $want=uc($ldir) . "." . uc($lfile);
+    my %files=get_cat($ldrive);
+    error(214,"Not found") unless defined($files{$want});
+    my @d=load_file($files{$want}{fullpath});
+
+    my $r="";
+
+    my $cnt=0;
+    my ($hex,$ascii);
+    while (@d)
+    {
+      my $ch=shift @d;
+      if ($ch == 13)
+      {
+        $r .= "\r\n";
+      }
+      elsif ($ch < 32)
+      {
+        $r .= "|" . chr(65+$ch);
+      }
+      else
+      {
+        $r .= chr($ch);
+      }
+    }
+    send_output($r);
+  }
   elsif (cmd_match($cmd,"FOO"))
   {
     my $d=int(need_arg($args[0]));
@@ -1799,7 +1837,7 @@ sub OSGBPB()
   my $fn=read_byte;
   my $carry=0;
 
-  debug(1,"OSFIND $fn handle=$fh load=$load size=$size ptr=$ptr");
+  debug(1,"OSGBPB $fn handle=$fh load=$load size=$size ptr=$ptr");
   # If this is a file based call, check the handle is open
   if ($fn < 5)
   {
@@ -1844,6 +1882,7 @@ sub OSGBPB()
       $load += @d;
       $ptr += @d;
       $size -= @d;
+      $open_files{$fh}{ptr}=$ptr;
     }
   }
   elsif ($fn == 5)
@@ -1878,7 +1917,7 @@ sub OSGBPB()
     my @names=();
     foreach (sort keys %cat)
     {
-      push(@names,$cat{$_}{name}) if $cat{$_}{name};
+      push(@names,$cat{$_}{name}) if $cat{$_}{name} && $cat{$_}{matched};
     }
     if ($ptr > @names)
     {
