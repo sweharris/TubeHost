@@ -104,6 +104,7 @@ slots 0->9.  You can see the current disks loaded:
     Current drive: 5
     Current directory: $ (:5:$)
     Current library: :0.$
+    Current folder:
 
 There is an invisible drive L which is mapped to the _Library directory on the
 host.  This will be searched for bad commands if the normal search mechanism
@@ -133,6 +134,77 @@ eg
 Now "*GRONK" will print "HELLO".  This allows you to build out a library
 of commands that will always be present.  (You can, of course, use *DIN to
 change where the L drive points).
+
+Folders
+=======
+In v0.13 a new concept was added, called Folders.  These are directories
+in the tree that begin with the underscore (_) character.  These don't
+show as disks for *DCAT/*DIN purposes, but allow us to organise disks
+in an easier manner.  So, for example, you could put games disks in the
+_GAMES folder, test work in the _TEST folder.
+
+e.g.
+    % find Beeb_Disks -type d | sort
+    Beeb_Disks
+    Beeb_Disks/_GAMES
+    Beeb_Disks/_GAMES/0.Mr_Ee
+    Beeb_Disks/_GAMES/1.test1
+    Beeb_Disks/_GAMES/10.test10
+    Beeb_Disks/_GAMES/TAPES
+    Beeb_Disks/_JUNK
+    Beeb_Disks/_JUNK/_FOO
+    Beeb_Disks/_JUNK/_FOO/_BAR
+    Beeb_Disks/_TEST
+    Beeb_Disks/_TEST/Folders
+    Beeb_Disks/_TEST/Stuff
+
+Folders are displayed with *HFOLDERS, changed into with *HCF and can
+be created with *HMKF.  When a disk is loaded from a folder then the
+path is shown in the *HSTATUS command
+
+    >*HFOLDERS
+    Folders present:
+      ..
+      _GAMES
+      _JUNK
+      _TEST
+    >*HCF _GAMES
+    Current folder is: _GAMES
+    >*DCAT
+    Disks available:
+         0: 0.Mr_Ee
+         1: 1.test1
+        10: 10.test10
+        11: TAPES
+    >*DIN 0 0
+    >*HCF ..
+    Current folder is: 
+    >*HCF _JUNK
+    Current folder is: _JUNK
+    >*HCF _FOO
+    Current folder is: _JUNK/_FOO
+    >*HCF ^
+    Current folder is: 
+    >*HCF _TEST
+    Current folder is: _TEST
+    >*DIN 1 Folders
+    >*HSTATUS D
+    Disk 0: _GAMES/0.Mr_Ee
+    Disk 1: _TEST/Folders
+    Disk 2: 
+    Disk 3: 
+    Disk 4: 
+    Disk 5: 
+    Disk 6: 
+    Disk 7: 
+    Disk 8: 
+    Disk 9: 
+    
+    Current drive: 0
+    Current directory: $ (:0.$)
+    Current library: :0.$
+    Current folder: _TEST
+
 
 Functions handled
 =================
@@ -228,6 +300,21 @@ and not a generic Host application.  Calls *NOT* handled:
 *COMMANDS
 =========
 can be prefixed with a ! if a ROM or OS commands conflicts
+  *HCF
+     Host Change Folder
+     Changes the folder we look in for disks.  Folder names must start
+     with an underscore (_).  A special name of ".." means go up a level,
+     and "^" means go to the top of the tree
+
+  *HFOLDERS
+     Show sub-folders under the current folder.  Folders can be nested
+     as deeply as the filename allows.
+
+  *HMKF
+     Host Make Folder
+     Creates a new subfolder in the current folder.  Folder names must
+     start with an underscore (_)
+
   *HSTATUS [DF]
      Displays status of Host, including what disks are in what slots,
      current directory/library status, and what files are currently open.

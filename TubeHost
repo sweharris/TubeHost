@@ -48,8 +48,9 @@
 #                      Update open file PTR for OSGBPB
 #                      OSGBPB 8 ("read dir") wasn't limiting to the matches
 #                         Thanks to dominicbeesley for these
+# v0.13 - 2019/10/10 - Add the concept of folders with *HFOLDER *HCF *HMKF
 
-my $VERSION="0.12";
+my $VERSION="0.13";
 
 my $SERIAL=1;
 my $UPURS=0;
@@ -59,6 +60,7 @@ my $PAUSE_AFTER=1;
 my $PAUSE_DELAY=2;
 my $DEBUG=$ENV{DEBUG} || 0;
 my $disk_base=( $ENV{HOME}?$ENV{HOME}:"" ) . "/Beeb_Disks";
+my $current_folder="";
 my $identity="Anonymous";
 
 my @ORIG_ARGV=@ARGV;
@@ -634,9 +636,10 @@ sub get_disks()
 
   # First let's look for any disks beginning with a number; we'll put
   # that in that slot
-  foreach (<$disk_base/[0-9]*.*>)
+  foreach (<$disk_base/$current_folder/[0-9]*.*>)
   {
     next unless -d $_;
+    next if /^$disk_base\/$current_folder\/_/;  # Hide subdirectories
     s/^.*\///;
     my ($num,$name)=(/^(\d+)\.(.*)$/);
     next unless defined($num);
@@ -647,9 +650,11 @@ sub get_disks()
   }
   $dsk++;
   # Now any other disk
-  foreach (sort <$disk_base/*>)
+  foreach (sort <$disk_base/$current_folder/*>)
   {
     next unless -d $_;
+    next if /^$disk_base\/$current_folder\/_/;  # Hide subdirectories
+    next if /\/_Library$/;
     my $name=$_; $name=~s/^.*\///;
     next if $name =~ /^\d+\./;  # Already handled
     $d{$dsk}=$name;
@@ -676,6 +681,7 @@ sub get_cat($;$)
 
   my %files;
   # BBC will display files with different cases, but is case insensitive
+  debug(30,"Looking in $disk_base/$disks{$dr}");
   foreach (<$disk_base/$disks{$dr}/*>)
   {
     next unless -f $_;
@@ -854,7 +860,7 @@ sub OSFSC_cmd($$)
   # (this is safe 'cos we don't have any . in our internal commands,
   # and so things like :2.$.foo won't match and $.foo _should_ attempt
   # to match command "$." with an argument of foo ("i.2" for example)
-  if ($cmd=~/^([^\.]*\.)(.*)$/)
+  if ($cmd=~/^([^\.]*\.)(.+)$/)
   {
     $cmd=$1;
     @args=($2,@args);
@@ -876,6 +882,7 @@ sub OSFSC_cmd($$)
       $r .= "\r\nCurrent drive: $drive\r\n" .
             "Current directory: $dir (:$drive.$dir)\r\n" .
             "Current library: $lib\r\n" .
+            "Current folder: $current_folder\r\n" .
             "\r\n";
     }
     if ($what =~ /F/i)
@@ -926,8 +933,8 @@ sub OSFSC_cmd($$)
     my $want2=$want;
     $want2=~tr/ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_+.!@$%,-/_/c;
     error(253,"Bad characters present") unless $want eq $want2;
-    mkdir("$disk_base/$want");
-    debug(10,"Made $disk_base/$want");
+    mkdir("$disk_base/$current_folder/$want");
+    debug(10,"Made $disk_base/$current_folder/$want");
     send_output("$want created\r\n");
 ##    send_byte(0);
   }    
@@ -1157,6 +1164,72 @@ sub OSFSC_cmd($$)
     }
     send_output($r);
   }
+  elsif (cmd_match($cmd,"HFOLDERS"))
+  {
+    my $r="Folders present:\r\n  ..\r\n";
+    foreach (<$disk_base/$current_folder/_*>)
+    {
+      s/^$disk_base\/$current_folder\///;
+      $r .= "  $_\r\n";
+    }
+    send_output($r);
+  }
+  elsif (cmd_match($cmd,"HCF"))
+  {
+    my $d=$args[0];
+
+    if ($d ne "")
+    {
+      if ($d =~ /\//)
+      {
+        error(253,"Bad characters present");
+      }
+      elsif ($d eq "^")
+      {
+        $current_folder="";
+      }
+      elsif ($d eq "..")
+      {
+        $current_folder=~s![^/]*$!!;
+        $current_folder=~s!^/!!;
+        $current_folder=~s!/$!!;
+      }
+      elsif ($d !~ /^_/)
+      {
+        error(253,"Bad filename: missing _");
+      }
+      elsif ( -d "$disk_base/$current_folder/$d" )
+      {
+        $current_folder .= "/$d";
+        $current_folder =~ s!^/!!;
+      }
+      else
+      {
+        error(214,"Not found");
+      }
+    }
+    send_output("Current folder is: $current_folder\r\n");
+  }
+  elsif (cmd_match($cmd,"HMKF"))
+  {
+    my $d=need_arg($args[0]);
+
+    if ($d =~ /\//)
+    {
+      error(253,"Bad characters present");
+    }
+    elsif ($d !~ /^_/)
+    {
+      error(253,"Bad filename: missing _");
+    }
+    debug(10,"Creating $disk_base/$current_folder/$d");
+    mkdir("$disk_base/$current_folder/$d") || do
+    {
+      debug(1,"Failed to create $disk_base/$current_folder/$d");
+      error(201,"Can not create");
+    };
+    send_output("Created");
+  }
   elsif (cmd_match($cmd,"FOO"))
   {
     my $d=int(need_arg($args[0]));
@@ -1192,7 +1265,7 @@ sub find_and_load_disk($)
   if ($dn =~ /^\d+$/)
   {
     check_disk_num($dn,\%d);
-    $disks{$dr}=$d{$dn};
+    $disks{$dr}=$current_folder . "/" . $d{$dn};
   }
   else
   {
@@ -1209,13 +1282,14 @@ sub find_and_load_disk($)
       $name =~ s/^[0-9]+\.//;
       if ( (uc($d{$_}) eq $want) || ($name eq $want) )
       {
-        $disks{$dr}=$d{$_};
+        $disks{$dr}=$current_folder . "/" . $d{$_};
         $found=1;
         last;
       }
     }
     error(214,"File or path not found") unless $found;
   }
+  $disks{$dr} =~ s!^/!!;
   debug(1,"Drive $dr set to $disks{$dr}");
 }
 
