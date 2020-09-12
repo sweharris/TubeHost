@@ -53,6 +53,7 @@
 #                      *DIR wasn't allowing "*DIR 0"
 #                       (turns out handling was bad for "*DIR UU" and similar)
 #                      Mask out lower bits of OSFIND function call since
+#                      Fix *TYPE handling of control characters (offbyone)
 #                      we don't care about them
 #                         Thanks to dominicbeesley for these
 
@@ -1161,7 +1162,7 @@ sub OSFSC_cmd($$)
       }
       elsif ($ch < 32)
       {
-        $r .= "|" . chr(65+$ch);
+        $r .= "|" . chr(64+$ch);
       }
       else
       {
