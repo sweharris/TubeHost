@@ -1156,7 +1156,7 @@ sub OSFSC_cmd($$)
     while (@d)
     {
       my $ch=shift @d;
-      if ($ch == 13)
+      if ($ch == 13 || $ch == 10 )
       {
         $r .= "\r\n";
       }
