@@ -1473,8 +1473,6 @@ sub OSFILE()
     $flocked=$cat{$key}{locked};
     $crc=$cat{$key}{crc};
     $fend=$flocked?$FILE_LOCKED:$FILE_UNLOCKED;
-  } else {
-    $notexist=1;
   }
 
   my $a_return=1; # File found is the default return code (no directories!)

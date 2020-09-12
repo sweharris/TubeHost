@@ -963,7 +963,7 @@ sub OSFSC_cmd($$)
     my $d=need_arg($args[0]);
 
     my ($dr,$di)=decompose(canonify("$d.dummy"));
-    error(206,"Bad dir") unless $di;
+    error(206,"Bad dir") unless $di || ($di eq "0");
     ($drive,$dir)=($dr,$di);
 
     send_byte(0);
@@ -1142,9 +1142,13 @@ sub OSFSC_cmd($$)
       {
         $r .= "\r\n";
       }
+      elsif ($ch == 10)
+      {
+        # suppress!
+      }
       elsif ($ch < 32)
       {
-        $r .= "|" . chr(65+$ch);
+        $r .= "|" . chr(64+$ch);
       }
       else {
         $r .= chr($ch);
@@ -1510,7 +1514,7 @@ sub OSFILE()
       $data .= chr(0) x $save;
     }
     my $fh=new FileHandle ">$fullpath";
-    error(201,"Can not open file") unless $fh;
+    error(201,"Cannot open file $!") unless $fh;
     print $fh $data;
     close($fh);
     $crc=CalcCRC($data);
@@ -1571,9 +1575,13 @@ sub OSFIND()
   my $fn=read_byte;
 
   # function 0 (close) takes a byte; everything else takes a file
-  my $parm=$fn?extract_filename(read_string):read_char;
+  #DB: changed below to read_byte - was always closing _all_ files
+  my $parm=$fn?extract_filename(read_string):read_byte;
 
   debug(1,"OSFIND $fn $parm");
+
+  #DB: fix mask out unwanted bits in function code
+  $fn = $fn & 0xF0;
 
   if ($fn !=0 && $fn != 0x40 && $fn != 0x80 && $fn != 0xc0)
   {
@@ -1588,6 +1596,7 @@ sub OSFIND()
     my $r="";
     if ($parm == 0)
     {
+      debug(1, "CLOSING ALL FILES!");
       foreach (keys %open_files) { $r .= OSFIND_close($_); }
     }
     else
