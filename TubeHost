@@ -49,8 +49,14 @@
 #                      OSGBPB 8 ("read dir") wasn't limiting to the matches
 #                         Thanks to dominicbeesley for these
 # v0.13 - 2019/10/10 - Add the concept of folders with *HFOLDER *HCF *HMKF
+# v0.14 - 2020/09/12 - CLOSE# was always closing all files
+#                      *DIR wasn't allowing "*DIR 0"
+#                       (turns out handling was bad for "*DIR UU" and similar)
+#                      Mask out lower bits of OSFIND function call since
+#                      we don't care about them
+#                         Thanks to dominicbeesley for these
 
-my $VERSION="0.13";
+my $VERSION="0.14";
 
 my $SERIAL=1;
 my $UPURS=0;
@@ -974,8 +980,8 @@ sub OSFSC_cmd($$)
   {
     my $d=need_arg($args[0]);
 
-    my ($dr,$di)=decompose(canonify("$d.dummy"));
-    error(206,"Bad dir") unless $di;
+    my ($dr,$di,$dname)=decompose(canonify("$d.dummy"));
+    error(206,"Bad dir") unless $dname eq "DUMMY";
     ($drive,$dir)=($dr,$di);
 
     send_byte(0);
@@ -1645,8 +1651,11 @@ sub OSFIND()
 {
   my $fn=read_byte;
 
+  # Mask out unwanted bits in function code
+  $fn = $fn & 0xf0;
+
   # function 0 (close) takes a byte; everything else takes a file
-  my $parm=$fn?extract_filename(read_string):read_char;
+  my $parm=$fn?extract_filename(read_string):read_byte;
 
   debug(1,"OSFIND $fn $parm");
 
