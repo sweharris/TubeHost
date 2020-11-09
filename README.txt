@@ -306,6 +306,9 @@ can be prefixed with a ! if a ROM or OS commands conflicts
      with an underscore (_).  A special name of ".." means go up a level,
      and "^" means go to the top of the tree
 
+  *DDIR
+     This does the same as *HCF to match the new MMFS2 command
+
   *HFOLDERS
      Show sub-folders under the current folder.  Folders can be nested
      as deeply as the filename allows.

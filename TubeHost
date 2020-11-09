@@ -53,11 +53,13 @@
 #                      *DIR wasn't allowing "*DIR 0"
 #                       (turns out handling was bad for "*DIR UU" and similar)
 #                      Mask out lower bits of OSFIND function call since
-#                      Fix *TYPE handling of control characters (offbyone)
 #                      we don't care about them
+#                      Fix *TYPE handling of control characters (offbyone)
 #                         Thanks to dominicbeesley for these
+# v0.15 - 2020/11/08 - Add *DDIR as an alias for *HCF to match the new
+#                        MMFS2 command.
 
-my $VERSION="0.14";
+my $VERSION="0.15";
 
 my $SERIAL=1;
 my $UPURS=0;
@@ -1181,7 +1183,7 @@ sub OSFSC_cmd($$)
     }
     send_output($r);
   }
-  elsif (cmd_match($cmd,"HCF"))
+  elsif (cmd_match($cmd,"HCF") || cmd_match($cmd,"DDIR"))
   {
     my $d=$args[0];
 
