@@ -325,6 +325,11 @@ can be prefixed with a ! if a ROM or OS commands conflicts
   
   *DCAT
      Shows what disks (Unix subdirectories) are available
+     An optional file spec can be passed.  e.g.
+       > *DCAT *KILL*
+       Disks available:
+          126: 126.Killer-Gorilla
+          262: 262.Killer-hacked
    
   *DCREATE diskname
      Creates a new Unix subdirectory

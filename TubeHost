@@ -58,6 +58,8 @@
 #                         Thanks to dominicbeesley for these
 # v0.15 - 2020/11/08 - Add *DDIR as an alias for *HCF to match the new
 #                        MMFS2 command.
+#                      Allow *DCAT to have a filename to limit results.
+#                        e.g. *DCAT *goril*
 
 my $VERSION="0.15";
 
@@ -920,11 +922,18 @@ sub OSFSC_cmd($$)
   elsif (cmd_match($cmd,"DCAT"))
   {
     debug(1,"*DCAT");
+    my $want=$args[0] || '*';
+    # Convert BBC wildcards to regex
+    $want=~ s/(\W)/\\$1/g; # as per perlre
+    $want=~s/\\#/./g;
+    $want=~s/\\\*/.*/g;
+    debug(20,"Regex is $want");
     my %d=get_disks;
     my $res="Disks available:\r\n";
 
     foreach (sort { $a <=> $b} keys %d)
     {
+      next unless $d{$_} =~ /^$want$/i;
       $res .= sprintf("%6d: %s\r\n",$_,$d{$_});
     }
     send_output($res);
