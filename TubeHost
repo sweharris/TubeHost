@@ -60,8 +60,9 @@
 #                        MMFS2 command.
 #                      Allow *DCAT to have a filename to limit results.
 #                        e.g. *DCAT *goril*
+# v0.16 - 2021/06/08 - Fix "*.0"; previously it reported the current drive
 
-my $VERSION="0.15";
+my $VERSION="0.16";
 
 my $SERIAL=1;
 my $UPURS=0;
@@ -1457,7 +1458,7 @@ sub OSFSC_cat($)
   send_byte(127);
   my $string=read_string;
   my $dr=$drive;
-  if ($string)
+  if ($string ne "")
   {
     $dr=check_drive($string);
   }
