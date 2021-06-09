@@ -61,6 +61,7 @@
 #                      Allow *DCAT to have a filename to limit results.
 #                        e.g. *DCAT *goril*
 # v0.16 - 2021/06/08 - Fix "*.0"; previously it reported the current drive
+#                      Send an error on OSFILE 255 if file not exist
 
 my $VERSION="0.16";
 
@@ -1541,7 +1542,12 @@ sub OSFILE()
 
   # If we're not saving a new file then it must exist.  Return "not found"
   # if it doesn't
-  if ($cmd !=0 && $cmd != 7 && !$cat{$key})
+  # On LOAD return an error, otherwise send back response code 0
+  if ($cmd == 255 && !$cat{$key})
+  {
+    error(214,"Not found");
+  }
+  elsif ($cmd !=0 && $cmd != 7 && !$cat{$key})
   {
     # We have to send the whole parameter block for a non-existing file
     send_byte(0); # File not found
